@@ -1,7 +1,7 @@
 import os
 from typing import Union, Tuple, List
 from reclab.datasets.utils import _create_dataset_directory
-from reclab.datasets.dataIterator import LazyCSVIterableDataset
+from reclab.datasets.multiTableDataset import MultiTableDataset
 
 DATASET_NAME = "BLOG_REC"
 
@@ -15,21 +15,17 @@ EXPECTED_TABLES = ["Author Data.csv", "Blog Ratings.csv", "Medium Blog Data.csv"
 def BLOG_REC(
     root: str, 
     url =  URL,
-    chunk_size = 1000,
     delimiter=','
 ):
     
     zip_path = os.path.join(root, DATASET_NAME)
     extract_folder = os.path.join(root,  "extracted")
     url = URL
-    blog_rec_dataset = LazyCSVIterableDataset(
+    blog_rec_dataset = MultiTableDataset(
         url,
         zip_path,
         extract_folder,
         EXPECTED_TABLES,
-        chunk_size= chunk_size,
         delimiter=delimiter
     )
     return blog_rec_dataset
-
-

@@ -5,19 +5,56 @@ from typing import List, Optional, Dict, Any, Iterator
 from torch.utils.data import IterableDataset
 from reclab._download_hooks import DownloadManager
 
-class TableIterableDataset(IterableDataset):
-            def __init__(self, data, chunk_size):
-                self.data = data
+class FileIterableDataset(IterableDataset):
+            def __init__(self, parent, table_name, delimiter, chunk_size, start, end):
+                self.parent = parent
+                self.table_name = table_name
+                self.delimiter = delimiter
                 self.chunk_size = chunk_size
-            def __iter__(self):
-                if self.chunk_size is None:
-                    for row in self.data:
-                        yield row
-                else:
-                    for i in range(0, len(self.data), self.chunk_size):
-                        chunk = self.data[i:i+self.chunk_size]
-                        for row in chunk:
+                self.start = start
+                self.end = end
+
+            def __iter__(self) -> Iterator[List[str]]:
+                # Ensure data is available on disk
+                self.parent._download_if_needed()
+                self.parent._extract_if_needed()
+
+                csv_path = os.path.join(self.parent.extract_folder, self.table_name)
+                with open(csv_path, "r", encoding="utf-8") as f:
+                    reader = csv.reader(f, delimiter=self.delimiter)
+                    header = next(reader, None)  # skip the header line
+
+                    # Skip 'start' lines if specified
+                    if self.start is not None:
+                        for _ in range(self.start):
+                            next(reader, None)
+
+                    current_index = 0
+                    buffer = []
+                    rows_to_read = None
+                    if self.end is not None:
+                        offset = self.start if self.start is not None else 0
+                        rows_to_read = self.end - offset
+
+                    for row in reader:
+                        if rows_to_read is not None and current_index >= rows_to_read:
+                            break
+
+                        if self.chunk_size is None:
                             yield row
+                        else:
+                            buffer.append(row)
+                            if len(buffer) == self.chunk_size:
+                                for r in buffer:
+                                    yield r
+                                buffer.clear()
+
+                        current_index += 1
+
+                    # If chunking and leftover in buffer
+                    if self.chunk_size is not None and buffer:
+                        for r in buffer:
+                            yield r
 
 class MultiTableDataset:
     def __init__(
@@ -30,12 +67,12 @@ class MultiTableDataset:
     ):
         """
         A multi-table dataset class that lazily loads multiple CSV files from a ZIP archive.
-        
+
         Args:
             url (str): URL of the dataset ZIP file
             zip_path (str): Local path to save the downloaded ZIP file
             extract_folder (str): Directory where the ZIP will be extracted
-            expected_csv_files (List[str]): List of CSV files expected to be found in the ZIP
+            expected_csv_files (List[str]): List of CSV files expected in the ZIP
             delimiter (str): CSV delimiter, often ','
         """
         self.url = url
@@ -45,24 +82,21 @@ class MultiTableDataset:
         self.delimiter = delimiter
 
         self._data_loaded = False
-        self._tables_data: Dict[str, List[List[str]]] = {}   # {table_name: [ [row], [row], ... ]}
-        self._tables_header: Dict[str, Optional[List[str]]] = {}  # {table_name: [col_names] or None}
+        self._tables_data: Dict[str, List[List[str]]] = {}
+        self._tables_header: Dict[str, Optional[List[str]]] = {}
 
     def _download_if_needed(self):
-        # Download the ZIP file if it does not exist locally
         if not os.path.exists(self.zip_path):
             os.makedirs(os.path.dirname(self.zip_path), exist_ok=True)
             dm = DownloadManager()
             dm.get_local_path(self.url, self.zip_path)
 
     def _extract_if_needed(self):
-        # Extract the ZIP file if not already extracted
         if not os.path.exists(self.extract_folder):
             os.makedirs(self.extract_folder, exist_ok=True)
             with zipfile.ZipFile(self.zip_path, 'r') as zf:
                 zf.extractall(self.extract_folder)
 
-        # Check if all expected CSV files are present
         actual_files = os.listdir(self.extract_folder)
         missing = [f for f in self.expected_csv_files if f not in actual_files]
         if missing:
@@ -93,18 +127,26 @@ class MultiTableDataset:
         return self.expected_csv_files
 
     def get_table_data(self, table_name: str) -> List[List[str]]:
-        """Return all rows of a specific table as a list of lists."""
+        """Return all rows of a specific table as a list of lists (fully loaded in memory)."""
         if table_name not in self.expected_csv_files:
             raise ValueError(f"Table {table_name} not in dataset.")
         self._load_data_into_memory()
         return self._tables_data[table_name]
 
     def get_table_header(self, table_name: str) -> Optional[List[str]]:
-        """Return the header (column names) of a table if available."""
+        """Return the header (column names) of a table without fully loading data."""
         if table_name not in self.expected_csv_files:
             raise ValueError(f"Table {table_name} not in dataset.")
-        self._load_data_into_memory()
-        return self._tables_header[table_name]
+
+        # Ensure the file is available
+        self._download_if_needed()
+        self._extract_if_needed()
+
+        csv_path = os.path.join(self.extract_folder, table_name)
+        with open(csv_path, "r", encoding="utf-8") as f:
+            reader = csv.reader(f, delimiter=self.delimiter)
+            header = next(reader, None)  # The first line is the header
+            return header
 
     def get_table_info(self, table_name: str) -> Dict[str, Any]:
         """Return information about a table, such as number of rows, number of columns, and header."""
@@ -118,35 +160,12 @@ class MultiTableDataset:
             "header": header
         }
 
-    def get_table_iter(self, table_name: str, chunk_size: Optional[int] = None,
-                       start: Optional[int] = None, end: Optional[int] = None) -> Iterator[List[str]]:
-        """
-        Return an iterator over the specified table's rows, supporting slicing and optional chunking.
-        
-        Args:
-            table_name (str): The table to iterate over
-            chunk_size (int, optional): If provided, rows are yielded in chunks of this size
-            start (int, optional): Start index (inclusive)
-            end (int, optional): End index (exclusive)
-        """
-        data = self.get_table_data(table_name)
-        sliced_data = data[start:end]
-
-        if chunk_size is None:
-            for row in sliced_data:
-                yield row
-        else:
-            for i in range(0, len(sliced_data), chunk_size):
-                chunk = sliced_data[i:i+chunk_size]
-                for row in chunk:
-                    yield row
-
-    def get_table_dataset(self, table_name: str, 
+    def iter_loader(self, table_name: str, 
                           chunk_size: Optional[int] = None,
                           start: Optional[int] = None, 
                           end: Optional[int] = None) -> IterableDataset:
         """
-        Return a PyTorch IterableDataset object for the specified table, supporting slicing and chunking.
+        Return a PyTorch IterableDataset object for the specified table, streaming from the file.
 
         Args:
             table_name (str): The table name
@@ -154,6 +173,9 @@ class MultiTableDataset:
             start (int, optional): Start index (inclusive)
             end (int, optional): End index (exclusive)
         """
-        data = self.get_table_data(table_name)
-        sliced_data = data[start:end]
-        return TableIterableDataset(sliced_data, chunk_size)
+
+        if table_name not in self.expected_csv_files:
+            raise ValueError(f"Table {table_name} not in dataset.")
+
+
+        return FileIterableDataset(self, table_name, self.delimiter, chunk_size, start, end)
