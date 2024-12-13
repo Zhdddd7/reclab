@@ -1,4 +1,3 @@
-import warnings
 import importlib
 
 from .blog_rec import BLOG_REC

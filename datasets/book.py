@@ -17,7 +17,6 @@ def BOOK(
     url =  URL,
     delimiter=','
 ):
-    
     zip_path = os.path.join(root, DATASET_NAME)
     extract_folder = os.path.join(root,  "extracted")
     url = URL

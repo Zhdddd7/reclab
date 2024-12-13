@@ -1,5 +1,6 @@
 from reclab.datasets import BLOG_REC, MOVIE, BOOK
 from torch.utils.data import DataLoader
+from reclab.data.test_autoFE import FeatureStreaming
 
 # dataset unit test
 def blog_rec_test():
@@ -25,9 +26,22 @@ def movie_test():
 def book_test():
     test_ds = BOOK()
     test_ds.list_tables()
-    movie_loader = test_ds.iter_loader('Books.csv', start = 1, end = 5)
+    movie_loader = test_ds.iter_loader('Books.csv', start = 1, end = 20)
+    print(test_ds.get_table_header('Books.csv'))
     loader = DataLoader(movie_loader, batch_size=None)
-    print(list(loader))
+    for data in movie_loader:
+        print(data)
     print(f"the tables info are {test_ds.get_table_info('Books.csv')}")
 
-book_test()
+def test_featureStreaming():
+    bk = BOOK()
+    loader = DataLoader(bk.iter_loader('Books.csv', start = 1, end = 201))
+    header = bk.get_table_header('Books.csv')
+    fts = FeatureStreaming(loader, 100, header)
+    while True:
+        batch_df = fts.process()
+        if batch_df.empty:
+            break
+        print(batch_df)
+
+test_featureStreaming()
