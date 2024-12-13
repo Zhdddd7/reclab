@@ -1,4 +1,4 @@
-from reclab.datasets import BLOG_REC, MOVIE
+from reclab.datasets import BLOG_REC, MOVIE, BOOK
 from torch.utils.data import DataLoader
 
 # dataset unit test
@@ -19,7 +19,15 @@ def movie_test():
     test_ds.list_tables()
     movie_loader = test_ds.iter_loader('movies.csv', start = 1, end = 5)
     loader = DataLoader(movie_loader, batch_size=None)
-    print(list(movie_loader))
+    print(list(loader))
     print(f"the tables info are {test_ds.get_table_info('movies.csv')}")
 
-movie_test()
+def book_test():
+    test_ds = BOOK()
+    test_ds.list_tables()
+    movie_loader = test_ds.iter_loader('Books.csv', start = 1, end = 5)
+    loader = DataLoader(movie_loader, batch_size=None)
+    print(list(loader))
+    print(f"the tables info are {test_ds.get_table_info('Books.csv')}")
+
+book_test()

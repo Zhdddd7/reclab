@@ -3,9 +3,11 @@ import importlib
 
 from .blog_rec import BLOG_REC
 from .movie import MOVIE
+from .book import BOOK
 DATASETS = {
     "BLOG_REC": BLOG_REC,
-    "MOVIE": MOVIE 
+    "MOVIE": MOVIE,
+    "BOOK": BOOK
 }
 URLS = {}
 NUM_LINES = {}
