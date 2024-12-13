@@ -15,25 +15,24 @@ pip install reclab
 from reclab.datasets import BLOG_REC  # Example dataset loader
 
 # Initialize the dataset; no data is loaded yet
-blog_rec_dataset = BLOG_REC()
-
-# Iterate over the dataset to trigger lazy loading and chunk processing
-for i, row in enumerate(train_dataset):
-    print(row)
-    if i > 10:
-        break
+test_ds = BLOG_REC()
+# Show the table list in this dataset
+test_ds.list_tables()
 ```
-### Multi-Table and Slicing
+### Data Full Read
+Data full read will load all the table to storage. This works good for small tables.
 ```
-print(blog_rec_dataset.list_tables())
-print(blog_rec_dataset.info())
-print(blog_rec_dataset.table_info('Author Data.csv'))
-# Iterate over the first 500 rows of Author Data
-for i, user_row in enumerate(dataset.get_table_iter("Author Data.csv", start=0, end=500)):
-    if i < 5:
-        print(user_row)
-    else:
-        break
+full_data_author = test_ds.get_table_data('Author Data.csv')
+```
+### Data Streaming Read
+Data streaming will read data from a iterable file stream object, which only load the data when the data is used. This load strategy works good for big tables.
+Besides, the dataset iter object is adapt to DataLoader in torch.utils.data, so you can definitely use this module just as a dataset reader and convert it to DataLoader without changing your original code.
+```
+from torch.utils.data import DataLoader
+author_loader = test_ds.iter_loader('Author Data.csv')
+author_loader_slice = test_ds.iter_loader('Author Data.csv', start = 1, end = 3)
+author_loader_chunk = test_ds.iter_loader('Author Data.csv', chunk_size = 3)
+loader = DataLoader(author_loader_slice, batch_size=None)
 ```
 ## Train and Evaluatin
 ## Version

@@ -1,14 +1,6 @@
 from reclab.datasets.blog_rec import BLOG_REC
-
-# test_ds = BLOG_REC()
-
-# for i, ele in enumerate(test_ds):
-#     if i < 5:
-#         print(ele)
-#     else:
-#         break
-
 from torch.utils.data import DataLoader
+
 test_ds = BLOG_REC()
 test_ds.list_tables()
 
