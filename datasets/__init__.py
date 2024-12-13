@@ -2,8 +2,10 @@ import warnings
 import importlib
 
 from .blog_rec import BLOG_REC
+from .movie import MOVIE
 DATASETS = {
-    "BLOG_REC": BLOG_REC 
+    "BLOG_REC": BLOG_REC,
+    "MOVIE": MOVIE 
 }
 URLS = {}
 NUM_LINES = {}
