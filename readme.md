@@ -77,4 +77,6 @@ The acc trained by selected features on SVM: 0.9202127659574468
 ```
 ## Train and Evaluatin
 ## Version
+0.0.1
+still working for a released version!...
 
