@@ -3,7 +3,7 @@ import os
 
 _REC_BUCKET = "not decide"
 
-_CACHE_DIR = os.path.expanduser(os.path.join('~', "torch_rec"))
+_CACHE_DIR = os.path.expanduser(os.path.join('~', "reclab"))
 
 
 
