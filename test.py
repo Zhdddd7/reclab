@@ -1,6 +1,13 @@
 from reclab.datasets import BLOG_REC, MOVIE, BOOK
 from torch.utils.data import DataLoader
 from reclab.data.test_autoFE import FeatureStreaming
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score
+import pandas as pd
+from reclab.data.gradientSelector import FeatureGradientSelector
+
 
 # dataset unit test
 def blog_rec_test():
@@ -44,4 +51,43 @@ def test_featureStreaming():
             break
         print(batch_df)
 
-test_featureStreaming()
+def test_featureSelector():
+    # 加载癌证数据集
+    data = load_breast_cancer()
+    X = pd.DataFrame(data.data, columns=data.feature_names)
+    y = pd.Series(data.target)
+
+    # 打印原始特征列名
+    print("The Original feature names are:")
+    print(list(X.columns))
+
+    # 初始化特征选择器并选择 Top 10 特征
+    selector = FeatureGradientSelector(n_features=10)
+    selector.fit(X, y)
+    selected_features = selector.get_features(indices=True)
+
+    # 打印选择的 Top 10 特征列名
+    print("\nThe Selected feature names are:")
+    print(list(X.columns[selected_features]))
+
+    # 数据集分割
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=42)
+
+    # 使用原始特征训练 SVM
+    svm_all = SVC(random_state=42)
+    svm_all.fit(X_train, y_train)
+    y_pred_all = svm_all.predict(X_test)
+    accuracy_all = accuracy_score(y_test, y_pred_all)
+    print("\nThe acc trained by original features on SVM:", accuracy_all)
+
+    # 使用选择的特征训练 SVM
+    X_train_selected = X_train.iloc[:, selected_features]
+    X_test_selected = X_test.iloc[:, selected_features]
+
+    svm_selected = SVC(random_state=42)
+    svm_selected.fit(X_train_selected, y_train)
+    y_pred_selected = svm_selected.predict(X_test_selected)
+    accuracy_selected = accuracy_score(y_test, y_pred_selected)
+    print("The acc trained by selected features on SVM:", accuracy_selected)
+
+test_featureSelector()
